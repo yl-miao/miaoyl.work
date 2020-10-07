@@ -1,2 +1,2 @@
 User-agent: *
-Sitemap: https://miaoyl.work/sitemap.xml
+Sitemap: https://miaoyilin.com/sitemap.xml
