@@ -1,0 +1,218 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="IE=edge,chrome=1"><title>给Ubuntu 20.04 LTS添加一个系统调用 - MIAO Yilin</title><meta name=renderer content="webkit"><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1"><meta http-equiv=cache-control content="no-transform"><meta http-equiv=cache-control content="no-siteapp"><meta name=theme-color content="#f8f5ec"><meta name=msapplication-navbutton-color content="#f8f5ec"><meta name=apple-mobile-web-app-capable content="yes"><meta name=apple-mobile-web-app-status-bar-style content="#f8f5ec"><meta name=author content="MIAO Yilin"><meta name=description content="下载Linux内核源代码，添加系统调用，编译一个新的内核，并切换至新内核。"><meta name=keywords content="MIAO Yilin,MIAO Yilin's blog"><link rel=canonical href=https://miaoyilin.com/post/syscall/><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/manifest.json><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link href=/sass/main.min.955e3a96a4d67ee931977ca2684c5a5ecbaa23a3eb977819ef3371b0e53205ec.css rel=stylesheet><meta property="og:title" content="给Ubuntu 20.04 LTS添加一个系统调用"><meta property="og:description" content="下载Linux内核源代码，添加系统调用，编译一个新的内核，并切换至新内核。"><meta property="og:type" content="article"><meta property="og:url" content="https://miaoyilin.com/post/syscall/"><meta property="article:published_time" content="2020-12-08T13:37:14+08:00"><meta property="article:modified_time" content="2020-12-11T15:34:14+08:00"><meta itemprop=name content="给Ubuntu 20.04 LTS添加一个系统调用"><meta itemprop=description content="下载Linux内核源代码，添加系统调用，编译一个新的内核，并切换至新内核。"><meta itemprop=datePublished content="2020-12-08T13:37:14+08:00"><meta itemprop=dateModified content="2020-12-11T15:34:14+08:00"><meta itemprop=wordCount content="1367"><meta itemprop=keywords content="Linux,Kernel,Syscall,"><meta name=twitter:card content="summary"><meta name=twitter:title content="给Ubuntu 20.04 LTS添加一个系统调用"><meta name=twitter:description content="下载Linux内核源代码，添加系统调用，编译一个新的内核，并切换至新内核。"><!--[if lte IE 9]><script src=https://cdnjs.cloudflare.com/ajax/libs/classlist/1.1.20170427/classList.min.js></script><![endif]--><!--[if lt IE 9]><script src=https://cdn.jsdelivr.net/npm/html5shiv@3.7.3/dist/html5shiv.min.js></script><script src=https://cdn.jsdelivr.net/npm/respond.js@1.4.2/dest/respond.min.js></script><![endif]--></head><body><div id=mobile-navbar class=mobile-navbar><div class=mobile-header-logo><a href=/ class=logo>MIAO Yilin</a></div><div class=mobile-navbar-icon><span></span><span></span><span></span></div></div><nav id=mobile-menu class="mobile-menu slideout-menu"><ul class=mobile-menu-list><a href=/><li class=mobile-menu-item>Home</li></a><a href=/post/><li class=mobile-menu-item>Archives</li></a><a href=/tags/><li class=mobile-menu-item>Tags</li></a><a href=/categories/><li class=mobile-menu-item>Categories</li></a><a href=/about/><li class=mobile-menu-item>About</li></a></ul></nav><div class=container id=mobile-panel><header id=header class=header><div class=logo-wrapper><a href=/ class=logo>MIAO Yilin</a></div><nav class=site-navbar><ul id=menu class=menu><li class=menu-item><a class=menu-item-link href=/>Home</a></li><li class=menu-item><a class=menu-item-link href=/post/>Archives</a></li><li class=menu-item><a class=menu-item-link href=/tags/>Tags</a></li><li class=menu-item><a class=menu-item-link href=/categories/>Categories</a></li><li class=menu-item><a class=menu-item-link href=/about/>About</a></li></ul></nav></header><main id=main class=main><div class=content-wrapper><div id=content class=content><article class=post><header class=post-header><h1 class=post-title>给Ubuntu 20.04 LTS添加一个系统调用</h1><div class=post-meta><span class=post-time>2020-12-08</span><div class=post-category><a href=/categories/tech/>tech</a></div></div></header><div class=post-toc id=post-toc><h2 class=post-toc-title>Contents</h2><div class="post-toc-content always-active"><nav id=TableOfContents><ul><li><a href=#前提>前提</a></li><li><a href=#准备>准备</a></li><li><a href=#下载和更改源代码>下载和更改源代码</a><ul><li><a href=#下载内核源代码>下载内核源代码</a></li><li><a href=#添加系统调用>添加系统调用</a></li></ul></li><li><a href=#编译并切换至新内核>编译并切换至新内核</a></li><li><a href=#检测系统调用>检测系统调用</a></li><li><a href=#附1-linux常用指令>附1-Linux常用指令</a></li><li><a href=#附2-参考链接>附2-参考链接</a></li></ul></nav></div></div><div class=post-content><p>下载Linux内核源代码，添加系统调用，编译一个新的内核，并切换至新内核。</p><h2 id=前提>前提</h2><ul><li>最好空闲空间50G以上(<code>df -hl</code>可查看磁盘占用，<code>baobab</code>可自动分析大目录)；</li><li>运行内存4G以上，否则编译5.x新内核并切换之后，会卡在“Loading initial ramdisk&mldr;”；</li><li>如果是双系统出错了后果可能比较麻烦，虚拟机可以在操作之前拍摄快照；</li><li>这篇文章是在Ubuntu 20.04 LTS环境下测试的。</li></ul><h2 id=准备>准备</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash><span class=c1>#开启BBR网络加速</span>
+<span class=nb>echo</span> net.core.default_qdisc<span class=o>=</span>fq &gt;&gt; /etc/sysctl.conf
+<span class=nb>echo</span> net.ipv4.tcp_congestion_control<span class=o>=</span>bbr &gt;&gt; /etc/sysctl.conf
+sysctl -p
+<span class=c1>#更新软件并安装编译所需软件</span>
+sudo apt update <span class=o>&amp;&amp;</span> sudo apt upgrade -y
+sudo apt install build-essential libncurses-dev libssl-dev libelf-dev bison flex -y
+<span class=c1>#记得把apt源切换到你网络访问最快的镜像</span>
+</code></pre></td></tr></table></div></div><h2 id=下载和更改源代码>下载和更改源代码</h2><h3 id=下载内核源代码>下载内核源代码</h3><p>首先去这里找一个想编译的新内核源代码版本并下载：<a href=https://mirrors.tuna.tsinghua.edu.cn/kernel/v5.x/>https://mirrors.tuna.tsinghua.edu.cn/kernel/v5.x/</a>，不需要和<code>uname -r</code>目前显示的内核版本一样。以5.8.1为例：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>wget https://mirrors.tuna.tsinghua.edu.cn/kernel/v5.x/linux-5.8.1.tar.xz
+</code></pre></td></tr></table></div></div><p>解压：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>tar -xvf linux-5.8.1.tar.xz
+<span class=nb>cd</span> linux-5.8.1
+</code></pre></td></tr></table></div></div><h3 id=添加系统调用>添加系统调用</h3><p>假设要添加的系统调用名称为<code>hello</code>，从现在开始保持一致。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>mkdir hello
+nano hello/hello.c
+</code></pre></td></tr></table></div></div><p>输入：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-c++ data-lang=c++><span class=cp>#include</span> <span class=cpf>&lt;linux/kernel.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;linux/syscalls.h&gt;</span><span class=cp>
+</span><span class=cp></span>
+<span class=n>SYSCALL_DEFINE0</span><span class=p>(</span><span class=n>hello</span><span class=p>){</span>
+    <span class=n>printk</span><span class=p>(</span><span class=s>&#34;hello, kernel! -Miao</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+    <span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+<span class=p>}</span>
+</code></pre></td></tr></table></div></div><p>然后<code>nano hello/Makefile</code>并输入：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>obj-y :<span class=o>=</span> hello.o
+<span class=c1>#(nano编辑器ctrl+x,y保存)</span>
+</code></pre></td></tr></table></div></div><p>然后：<code>gedit Makefile</code>，把<code>core-y += kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/</code>这一行的最后加上空格和系统调用名称/，如：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-fallback data-lang=fallback>core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ hello/
+</code></pre></td></tr></table></div></div><p>然后在<code>syscalls.h</code>文件添加声明：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>gedit include/linux/syscalls.h
+<span class=c1>#(gedit编辑器ctrl+s保存)</span>
+</code></pre></td></tr></table></div></div><p>在最后#endif的上一行加上：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-c++ data-lang=c++><span class=n>asmlinkage</span> <span class=kt>long</span> <span class=nf>sys_hello</span><span class=p>(</span><span class=kt>void</span><span class=p>);</span>
+</code></pre></td></tr></table></div></div><p>然后在<code>syscall_64.tbl</code>文件添加说明：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>gedit arch/x86/entry/syscalls/syscall_64.tbl
+</code></pre></td></tr></table></div></div><p>里面有一些是common的，有一些是x32的，在中间common的那些调用的最下面加上：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-fallback data-lang=fallback>440	common	hello			sys_hello
+</code></pre></td></tr></table></div></div><p>用Tab键调整格式，其中440这个行号是根据common最后一行+1来的。</p><h2 id=编译并切换至新内核>编译并切换至新内核</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>make menuconfig
+</code></pre></td></tr></table></div></div><p>按两次ESC，回车，直接保存默认配置。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>nproc
+</code></pre></td></tr></table></div></div><p>查看线程数，假如输出8，下一步就可以-j8加速。</p><p>编译内核的源代码(耐心等待)：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>make -j8
+</code></pre></td></tr></table></div></div><p>准备内核安装器：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>sudo make modules_install -j8
+</code></pre></td></tr></table></div></div><p>安装内核：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>sudo make install -j8
+</code></pre></td></tr></table></div></div><p>更新操作系统的引导程序，并重启：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>sudo update-grub
+sudo reboot
+</code></pre></td></tr></table></div></div><h2 id=检测系统调用>检测系统调用</h2><p>首先，<code>uname -r</code>应该会输出编译好的新内核。</p><p>然后，<code>nano test.c</code>并输入：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-c++ data-lang=c++><span class=cp>#include</span> <span class=cpf>&lt;linux/kernel.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;sys/syscall.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;stdio.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;unistd.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;string.h&gt;</span><span class=cp>
+</span><span class=cp>#include</span> <span class=cpf>&lt;errno.h&gt;</span><span class=cp>
+</span><span class=cp></span>
+<span class=cp>#define __NR_identity 440
+</span><span class=cp></span>
+<span class=kt>long</span> <span class=nf>identity_syscall</span><span class=p>(</span><span class=kt>void</span><span class=p>){</span>
+    <span class=k>return</span> <span class=n>syscall</span><span class=p>(</span><span class=n>__NR_identity</span><span class=p>);</span>
+<span class=p>}</span>
+
+<span class=kt>int</span> <span class=nf>main</span><span class=p>(</span><span class=kt>int</span> <span class=n>argc</span><span class=p>,</span> <span class=kt>char</span> <span class=o>*</span><span class=n>argv</span><span class=p>[]){</span>
+    <span class=kt>long</span> <span class=n>activity</span><span class=p>;</span>
+    <span class=n>activity</span> <span class=o>=</span> <span class=n>identity_syscall</span><span class=p>();</span>
+
+    <span class=k>if</span><span class=p>(</span><span class=n>activity</span> <span class=o>&lt;</span> <span class=mi>0</span><span class=p>){</span>
+        <span class=n>perror</span><span class=p>(</span><span class=s>&#34;Failed.&#34;</span><span class=p>);</span>
+    <span class=p>}</span><span class=k>else</span><span class=p>{</span>
+        <span class=n>printf</span><span class=p>(</span><span class=s>&#34;Succeeded. Run command &#39;dmesg&#39;!</span><span class=se>\n</span><span class=s>&#34;</span><span class=p>);</span>
+    <span class=p>}</span>
+    
+    <span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+<span class=p>}</span>
+</code></pre></td></tr></table></div></div><p>编译并运行：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash>gcc -o <span class=nb>test</span> test.c
+./test
+</code></pre></td></tr></table></div></div><p>若输出：<code>Succeeded. Run command 'dmesg'!</code>，则在命令行里输如<code>dmesg</code>，在输出的底部应该会出现：</p><p><code>hello, kernel! -Miao</code></p><p><strong>至此说明添加系统调用并调用成功。</strong></p><h2 id=附1-linux常用指令>附1-Linux常用指令</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span></code></pre></td><td class=lntd><pre class=chroma><code class=language-bash data-lang=bash><span class=c1>#开机启动：</span>
+/etc/rc.local 里面加上命令
+
+<span class=c1>#复制文件夹：</span>
+sudo cp -r ./a /mnt/data/a
+
+<span class=c1>#压缩文件夹：</span>
+sudo zip -r /mnt/data/a.zip ./a
+
+<span class=c1>#解压到路径：</span>
+sudo unzip -d /mnt/data/a a.zip
+
+<span class=c1>#查看剩余磁盘空间：</span>
+df -hl
+
+<span class=c1>#自动分析大目录：</span>
+baobab
+
+<span class=c1>#查看文件大小：</span>
+ls -hl filename
+
+<span class=c1>#查看文件夹大小：</span>
+du -h --max-depth<span class=o>=</span><span class=m>0</span> ./a
+
+<span class=c1>#把文件夹中的内容复制到另一个文件夹中：</span>
+cp -a A/. B
+
+<span class=c1>#把文件夹本身复制到另一个文件夹中：</span>
+cp -a A B
+
+<span class=c1>#查看当前目录下的文件数量（不包含子目录中的文件）</span>
+ls -l<span class=p>|</span>grep <span class=s2>&#34;^-&#34;</span><span class=p>|</span> wc -l
+
+<span class=c1>#给文件夹权限</span>
+sudo chmod <span class=m>777</span> -R /home/miaoyilin/
+
+<span class=c1>#多线程压缩目录，其中6是压缩等级，10是线程数</span>
+tar cv filename <span class=p>|</span> pigz -6 -p <span class=m>10</span> -k &gt; filename.tar.gz 
+
+<span class=c1>#多线程解压：</span>
+pigz -p <span class=m>10</span> -d filename.tgz
+</code></pre></td></tr></table></div></div><h2 id=附2-参考链接>附2-参考链接</h2><p><a href=https://dev.to/jasper/adding-a-system-call-to-the-linux-kernel-5-8-1-in-ubuntu-20-04-lts-2ga8>https://dev.to/jasper/adding-a-system-call-to-the-linux-kernel-5-8-1-in-ubuntu-20-04-lts-2ga8</a></p></div><div class=post-copyright><p class=copyright-item><span class=item-title>Author</span>
+<span class=item-content>MIAO Yilin</span></p><p class=copyright-item><span class=item-title>LastMod</span>
+<span class=item-content>2020-12-11</span></p><p class=copyright-item><span class=item-title>License</span>
+<span class=item-content><a rel="license noopener" href=https://creativecommons.org/licenses/by-nc-nd/4.0/ target=_blank>CC BY-NC-ND 4.0</a></span></p></div><footer class=post-footer><div class=post-tags><a href=/tags/linux/>Linux</a>
+<a href=/tags/kernel/>Kernel</a>
+<a href=/tags/syscall/>Syscall</a></div><nav class=post-nav><a class=next href=/post/vless-tls-caddy2-https/><span class="next-text nav-default">VLESS+TLS+HTTP2+Caddy 2与正常https网站共享443端口</span>
+<span class="next-text nav-mobile">Next</span>
+<i class="iconfont icon-right"></i></a></nav></footer></article></div></div></main><footer id=footer class=footer><div align=center><span class=copyright-year>&copy; 2020 <a href=https://miaoyilin.com/>Miao Yilin</a>.
+<a href=https://miaoyilin.com/about>About</a>
+<a href=https://miaoyilin.com/index.xml>RSS</a>
+<a href=https://miaoyilin.com/sitemap.xml>Sitemap</a>
+<script src=https://cdn.jsdelivr.net/npm/lazyload@2.0.0-rc.2/lazyload.min.js></script><script src=https://cdn.jsdelivr.net/npm/instantclick@3.1.0-2/dist/instantclick.min.js data-no-instant></script><script data-no-instant>InstantClick.on('change',function(){init();$('#toc').find("ul").remove();$("body").scrollspy()});InstantClick.init('14');</script></span></div></div></footer><div class=back-to-top id=back-to-top><i class="iconfont icon-up"></i></div></div><script src=https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js crossorigin=anonymous></script><script src=https://cdn.jsdelivr.net/npm/slideout@1.0.1/dist/slideout.min.js crossorigin=anonymous></script><script src=https://cdn.jsdelivr.net/npm/timeago.js@3.0.2/dist/timeago.min.js crossorigin=anonymous></script><script src=https://cdn.jsdelivr.net/npm/timeago.js@3.0.2/dist/timeago.locales.min.js crossorigin=anonymous></script><script>var languageCode="en".replace(/-/g,'_').replace(/_(.*)/,function($0,$1){return $0.replace($1,$1.toUpperCase());});timeago().render(document.querySelectorAll('.timeago'),languageCode);timeago.cancel();</script><script type=text/javascript src=/js/main.min.d7b7ada643c9c1a983026e177f141f7363b4640d619caf01d8831a6718cd44ea.js></script></body></html>
